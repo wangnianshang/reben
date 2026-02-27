@@ -1,7 +1,8 @@
 import { supabase } from '../supabaseClient'
+import { Note, CreateNoteDTO } from '../types'
 
 // 获取所有笔记（支持关键词和日期筛选）
-export const fetchNotes = async (keyword = '', date = '') => {
+export const fetchNotes = async (keyword: string = '', date: string = ''): Promise<Note[]> => {
   try {
     let query = supabase
       .from('notes')
@@ -9,15 +10,11 @@ export const fetchNotes = async (keyword = '', date = '') => {
       .order('created_at', { ascending: false })
 
     if (keyword) {
-      // 简单模糊搜索，仅支持 text 类型的 content
-      query = query.ilike('content', `%${keyword}%`)
+      // 简单模糊搜索，支持 text 类型的 content 或 description
+      query = query.or(`content.ilike.%${keyword}%,description.ilike.%${keyword}%`)
     }
 
     if (date) {
-      // 筛选特定日期的记录
-      // 假设 date 格式为 YYYY-MM-DD
-      // 为了处理时区问题，我们简单地按日期字符串匹配（如果存储的是 UTC 时间，这里可能需要调整）
-      // 更稳健的做法是比较范围
       const startDate = new Date(date)
       const endDate = new Date(date)
       endDate.setDate(endDate.getDate() + 1)
@@ -34,25 +31,24 @@ export const fetchNotes = async (keyword = '', date = '') => {
       throw error
     }
 
-    return data.map(note => ({
+    return (data as any[]).map(note => ({
       ...note,
       createdAt: note.created_at,
       updatedAt: note.updated_at
     }))
   } catch (error) {
     console.error('获取笔记失败:', error)
-    // 返回空数组以免崩溃前端
     return []
   }
 }
 
 // 创建笔记
-export const createNote = async (type, content) => {
+export const createNote = async (type: 'text' | 'image', content: string, description?: string): Promise<Note | null> => {
   try {
-    const newNote = {
+    const newNote: any = {
       type: type || 'text',
       content,
-      // created_at 和 updated_at 由数据库默认值处理
+      description
     }
 
     const { data, error } = await supabase
@@ -81,7 +77,7 @@ export const createNote = async (type, content) => {
 }
 
 // 删除笔记
-export const deleteNote = async (id) => {
+export const deleteNote = async (id: number) => {
   try {
     const { error } = await supabase
       .from('notes')
